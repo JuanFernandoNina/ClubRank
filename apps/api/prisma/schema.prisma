@@ -1,0 +1,253 @@
+// ClubRank — Prisma schema (SQLite para dev; migrable a PostgreSQL en producción)
+// Base: AnalisisDeRequerimientos.md y DiagramasDeSecuencia.md de docs/
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Núcleo / multi-tenant ----------
+
+model Organizacion {
+  id                  String             @id @default(cuid())
+  nombre              String
+  createdAt           DateTime           @default(now())
+  admins              Usuario[]
+  clubes              Club[]
+  eventos             Evento[]
+  motivosPenalizacion MotivoPenalizacion[]
+}
+
+model Usuario {
+  id              String            @id @default(cuid())
+  username        String            @unique
+  passwordHash    String
+  rol             Rol
+  organizacionId  String?
+  organizacion    Organizacion?     @relation(fields: [organizacionId], references: [id])
+  clubDirectorId  String?           @unique
+  clubDirector    Club?             @relation("DirectorDeClub", fields: [clubDirectorId], references: [id])
+  nombre          String?
+  creadoPorAdmin  Boolean           @default(false)
+  asignaciones    Asignacion[]
+  principalDe     EventoClub[]      @relation("StaffPrincipal")
+  evaluaciones    Evaluacion[]
+  incidentes      Incidente[]
+  penalizaciones  PenalizacionAplicada[]
+  notificaciones  Notificacion[]
+  auditorias      Auditoria[]
+  createdAt       DateTime          @default(now())
+
+  @@index([organizacionId])
+}
+
+enum Rol {
+  admin
+  staff
+  director
+}
+
+model Club {
+  id             String       @id @default(cuid())
+  nombre         String
+  organizacionId String
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id])
+  miembros       Miembro[]
+  eventos        EventoClub[]
+  director       Usuario?     @relation("DirectorDeClub")
+  createdAt      DateTime     @default(now())
+
+  @@index([organizacionId])
+}
+
+model Miembro {
+  id             String   @id @default(cuid())
+  nombre         String
+  edad           Int?
+  cargo          String?
+  anioIngreso    Int?
+  categoria      String?
+  clubId         String
+  club           Club     @relation(fields: [clubId], references: [id])
+  createdAt      DateTime @default(now())
+
+  @@index([clubId])
+}
+
+// ---------- Eventos y evaluación ----------
+
+model Evento {
+  id              String       @id @default(cuid())
+  nombre          String
+  fecha           DateTime
+  lugar           String?
+  tipo            String?
+  temporada       String       // ej. "2026"
+  puntajeMaximo   Int          @default(120)
+  cerrado         Boolean      @default(false)
+  organizacionId  String
+  organizacion    Organizacion @relation(fields: [organizacionId], references: [id])
+  criterios       Criterio[]
+  clubes          EventoClub[]
+  incidentes      Incidente[]
+  createdAt       DateTime     @default(now())
+
+  @@index([organizacionId])
+}
+
+model Criterio {
+  id       String   @id @default(cuid())
+  nombre   String
+  peso     Int      // 0-100, la suma debe ser 100
+  eventoId String
+  evento   Evento   @relation(fields: [eventoId], references: [id])
+  puntajes PuntajeCriterio[]
+
+  @@index([eventoId])
+}
+
+model EventoClub {
+  id          String      @id @default(cuid())
+  eventoId    String
+  clubId      String
+  evento      Evento      @relation(fields: [eventoId], references: [id])
+  club        Club        @relation(fields: [clubId], references: [id])
+  principalId String?     // Staff principal evaluador de este club en este evento
+  principal   Usuario?    @relation("StaffPrincipal", fields: [principalId], references: [id])
+  evaluaciones Evaluacion[]
+  incidentes  Incidente[]
+  penalizaciones PenalizacionAplicada[]
+  asignaciones Asignacion[]
+
+  @@unique([eventoId, clubId])
+  @@index([clubId])
+}
+
+// Usuario global → N asignaciones (Staff/Director) por evento/club
+model Asignacion {
+  id        String   @id @default(cuid())
+  usuarioId String
+  eventoClubId String
+  rol       Rol       // staff | director dentro de este evento
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id])
+  eventoClub EventoClub @relation(fields: [eventoClubId], references: [id])
+  createdAt DateTime  @default(now())
+
+  @@unique([usuarioId, eventoClubId])
+  @@index([eventoClubId])
+}
+
+model Evaluacion {
+  id          String    @id @default(cuid())
+  eventoClubId String
+  usuarioId   String
+  comentario  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  eventoClub  EventoClub @relation(fields: [eventoClubId], references: [id])
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id])
+  puntajes    PuntajeCriterio[]
+
+  @@unique([eventoClubId, usuarioId])
+  @@index([eventoClubId])
+}
+
+model PuntajeCriterio {
+  id          String    @id @default(cuid())
+  evaluacionId String
+  criterioId  String
+  valor       Int       // 0-100
+  evaluacion  Evaluacion @relation(fields: [evaluacionId], references: [id])
+  criterio    Criterio  @relation(fields: [criterioId], references: [id])
+
+  @@unique([evaluacionId, criterioId])
+}
+
+// ---------- Incidentes ----------
+
+enum EstadosIncidente {
+  abierto
+  en_revision
+  resuelto
+}
+
+model Incidente {
+  id            String           @id @default(cuid())
+  tipo          String
+  gravedad      String           // baja | media | alta
+  descripcion   String
+  estado        EstadosIncidente @default(abierto)
+  eventoId      String
+  eventoClubId  String?
+  usuarioId     String
+  evento        Evento           @relation(fields: [eventoId], references: [id])
+  eventoClub    EventoClub?      @relation(fields: [eventoClubId], references: [id])
+  usuario       Usuario          @relation(fields: [usuarioId], references: [id])
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([eventoId])
+  @@index([usuarioId])
+}
+
+// ---------- Penalizaciones ----------
+
+model MotivoPenalizacion {
+  id              String   @id @default(cuid())
+  nombre          String
+  descripcion     String?
+  puntosDescuento Int
+  activo          Boolean  @default(true)
+  organizacionId  String
+  organizacion    Organizacion @relation(fields: [organizacionId], references: [id])
+  aplicadas       PenalizacionAplicada[]
+
+  @@index([organizacionId])
+}
+
+model PenalizacionAplicada {
+  id          String   @id @default(cuid())
+  comentario  String?
+  anulada     Boolean  @default(false)
+  motivoId    String
+  eventoClubId String
+  usuarioId   String
+  motivo      MotivoPenalizacion @relation(fields: [motivoId], references: [id])
+  eventoClub  EventoClub @relation(fields: [eventoClubId], references: [id])
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([eventoClubId])
+  @@index([motivoId])
+}
+
+// ---------- In-app notifications y auditoría ----------
+
+model Notificacion {
+  id        String   @id @default(cuid())
+  usuarioId String
+  tipo      String   // incidente_grave | nuevo_resultado | ...
+  mensaje   String
+  leida     Boolean  @default(false)
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([usuarioId])
+}
+
+model Auditoria {
+  id        String   @id @default(cuid())
+  usuarioId String
+  accion    String   // evaluar | reportar | penalizar | anular | cerrar | reabrir | importar
+  detalle   String?
+  organizacionId String?
+  createdAt DateTime @default(now())
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId])
+  @@index([organizacionId])
+}
