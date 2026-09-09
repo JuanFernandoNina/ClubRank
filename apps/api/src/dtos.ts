@@ -59,6 +59,35 @@ export class RegistrarStaffDirectorDto {
   @IsOptional()
   @IsString()
   password?: string;
+
+  @IsOptional()
+  @IsString()
+  rol?: 'staff' | 'director';
+
+  @IsOptional()
+  @IsString()
+  clubId?: string;
+}
+
+export class ActualizarUsuarioDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(50)
+  nombre?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  password?: string;
+
+  @IsOptional()
+  @IsString()
+  rol?: 'staff' | 'director';
+
+  @IsOptional()
+  @IsString()
+  clubId?: string | null;
 }
 
 export class CrearCriterioDto {

@@ -76,6 +76,20 @@ export class IncidentesService {
     });
   }
 
+  /** Incidentes de un evento (para el Staff que evalúa) */
+  async listarDeEvento(eventoId: string) {
+    const evento = await this.prisma.evento.findUnique({ where: { id: eventoId } });
+    if (!evento) throw new NotFoundException('Evento no encontrado');
+    return this.prisma.incidente.findMany({
+      where: { eventoId },
+      include: {
+        eventoClub: { include: { club: { select: { id: true, nombre: true } } } },
+        usuario: { select: { id: true, nombre: true, username: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   /** RF-30: transición abierto -> en_revision -> resuelto */
   async cambiarEstado(incidenteId: string, dto: ActualizarIncidenteDto) {
     const incidente = await this.prisma.incidente.findUnique({

@@ -1,17 +1,21 @@
 import {
   Controller,
   Post,
+  Get,
+  Patch,
   Body,
   HttpCode,
   HttpStatus,
   UseGuards,
   Request,
+  Param,
   BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service.js';
 import { Roles } from './roles.decorator.js';
-import { RegistrarAdminDto, LoginDto, RegistrarStaffDirectorDto } from '../dtos.js';
+import { RolesGuard } from './guards.js';
+import { RegistrarAdminDto, LoginDto, RegistrarStaffDirectorDto, ActualizarUsuarioDto } from '../dtos.js';
 
 @Controller('auth')
 export class AuthController {
@@ -29,7 +33,7 @@ export class AuthController {
   }
 
   @Post('usuarios')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
   async registrarUsuario(
     @Request() req: { user: { rol: string; organizacionId: string; id: string } },
@@ -41,5 +45,26 @@ export class AuthController {
     const result = await this.auth.registroStaffDirector(dto, req.user.organizacionId);
     const { usuario, ...resto } = result;
     return { usuario: { id: usuario.id, username: usuario.username, nombre: usuario.nombre, rol: usuario.rol }, ...resto };
+  }
+
+  @Get('organizaciones/:orgId/usuarios')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  listarUsuarios(@Param('orgId') orgId: string) {
+    return this.auth.listarUsuarios(orgId);
+  }
+
+  @Patch('usuarios/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  actualizarUsuario(
+    @Param('id') id: string,
+    @Request() req: { user: { organizacionId: string | null } },
+    @Body() dto: ActualizarUsuarioDto,
+  ) {
+    if (!req.user.organizacionId) {
+      throw new BadRequestException('Admin sin organización asociada');
+    }
+    return this.auth.actualizarUsuario(id, req.user.organizacionId, dto);
   }
 }

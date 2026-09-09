@@ -65,6 +65,20 @@ export class PenalizacionesController {
     );
   }
 
+  // Listar penalizaciones de un evento (Staff/Admin)
+  @Get('eventos/:id/penalizaciones')
+  @UseGuards(AuthGuard('jwt'))
+  listarDeEvento(@Param('id') id: string) {
+    return this.service.listarDeEvento(id);
+  }
+
+  // Motivos de penalización de un evento (Staff/Admin)
+  @Get('eventos/:id/motivos-penalizacion')
+  @UseGuards(AuthGuard('jwt'))
+  listarMotivosDeEvento(@Param('id') id: string) {
+    return this.service.listarMotivosDeEvento(id);
+  }
+
   // Anular (solo Admin)
   @Delete('penalizaciones/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)

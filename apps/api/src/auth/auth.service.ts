@@ -2,6 +2,8 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -11,6 +13,7 @@ import {
   RegistrarAdminDto,
   LoginDto,
   RegistrarStaffDirectorDto,
+  ActualizarUsuarioDto,
 } from '../dtos.js';
 import { randomBytes } from 'crypto';
 
@@ -128,14 +131,16 @@ export class AuthService {
       return { usuario: existente, password: null as string | null, reutilizado: true };
     }
     const password = dto.password ?? randomBytes(6).toString('base64url');
+    const rol = dto.rol ?? 'staff';
     const usuario = await this.prisma.usuario.create({
       data: {
         nombre: dto.nombre,
         username: dto.username,
         passwordHash: await this.hash(password),
-        rol: 'staff',
+        rol,
         creadoPorAdmin: true,
         organizacionId,
+        ...(rol === 'director' && dto.clubId ? { clubDirectorId: dto.clubId } : {}),
       },
       select: {
         id: true,
@@ -146,5 +151,58 @@ export class AuthService {
       },
     });
     return { usuario, password, reutilizado: false };
+  }
+
+  /** Lista los usuarios de la organización (para la gestión de Admin) */
+  listarUsuarios(organizacionId: string) {
+    return this.prisma.usuario.findMany({
+      where: { organizacionId },
+      select: {
+        id: true,
+        username: true,
+        nombre: true,
+        rol: true,
+        creadoPorAdmin: true,
+        clubDirector: { select: { id: true, nombre: true } },
+      },
+      orderBy: [{ rol: 'asc' }, { nombre: 'asc' }],
+    });
+  }
+
+  /** Actualiza datos de un usuario (staff/director) de la organización. No permite editar el Admin. */
+  async actualizarUsuario(
+    usuarioId: string,
+    organizacionId: string,
+    dto: ActualizarUsuarioDto,
+  ) {
+    const usuario = await this.prisma.usuario.findUnique({ where: { id: usuarioId } });
+    if (!usuario || usuario.organizacionId !== organizacionId) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+    if (usuario.rol === 'admin') {
+      throw new BadRequestException('No se puede editar la cuenta de administrador desde aquí');
+    }
+    const data: {
+      nombre?: string;
+      rol?: 'staff' | 'director';
+      passwordHash?: string;
+      clubDirectorId?: string | null;
+    } = {};
+    if (dto.nombre !== undefined) data.nombre = dto.nombre;
+    if (dto.rol !== undefined) data.rol = dto.rol;
+    if (dto.password !== undefined) data.passwordHash = await this.hash(dto.password);
+    if (dto.rol === 'director') data.clubDirectorId = dto.clubId ?? null;
+    if (dto.rol === 'staff') data.clubDirectorId = null;
+    return this.prisma.usuario.update({
+      where: { id: usuarioId },
+      data,
+      select: {
+        id: true,
+        username: true,
+        nombre: true,
+        rol: true,
+        clubDirector: { select: { id: true, nombre: true } },
+      },
+    });
   }
 }

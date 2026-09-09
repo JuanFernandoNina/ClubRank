@@ -29,6 +29,12 @@ export class IncidentesController {
     return this.service.reportar(id, dto, req.user.id);
   }
 
+  @Get('eventos/:id/incidentes')
+  @UseGuards(AuthGuard('jwt'))
+  listarDeEvento(@Param('id') id: string) {
+    return this.service.listarDeEvento(id);
+  }
+
   @Get('organizaciones/:orgId/incidentes')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')

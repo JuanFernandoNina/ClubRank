@@ -60,4 +60,19 @@ export class ClubesService {
     await this.prisma.miembro.delete({ where: { id: miembroId } });
     return { ok: true };
   }
+
+  async actualizarMiembro(miembroId: string, dto: CrearMiembroDto) {
+    const m = await this.prisma.miembro.findUnique({ where: { id: miembroId } });
+    if (!m) throw new NotFoundException('Miembro no encontrado');
+    return this.prisma.miembro.update({
+      where: { id: miembroId },
+      data: {
+        ...(dto.nombre !== undefined ? { nombre: dto.nombre } : {}),
+        ...(dto.edad !== undefined ? { edad: dto.edad } : {}),
+        ...(dto.cargo !== undefined ? { cargo: dto.cargo ?? null } : {}),
+        ...(dto.anioIngreso !== undefined ? { anioIngreso: dto.anioIngreso } : {}),
+        ...(dto.categoria !== undefined ? { categoria: dto.categoria ?? null } : {}),
+      },
+    });
+  }
 }

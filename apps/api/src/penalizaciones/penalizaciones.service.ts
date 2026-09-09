@@ -22,6 +22,16 @@ export class PenalizacionesService {
     });
   }
 
+  /** Motivos activos de un evento (para el Staff que evalúa) */
+  async listarMotivosDeEvento(eventoId: string) {
+    const evento = await this.prisma.evento.findUnique({ where: { id: eventoId } });
+    if (!evento) throw new NotFoundException('Evento no encontrado');
+    return this.prisma.motivoPenalizacion.findMany({
+      where: { organizacionId: evento.organizacionId, activo: true },
+      orderBy: { nombre: 'asc' },
+    });
+  }
+
   crearMotivo(orgId: string, dto: CrearMotivoDto) {
     return this.prisma.motivoPenalizacion.create({
       data: { ...dto, organizacionId: orgId },
@@ -89,6 +99,21 @@ export class PenalizacionesService {
     return this.prisma.penalizacionAplicada.update({
       where: { id: penalizacionId },
       data: { anulada: true },
+    });
+  }
+
+  /** Penalizaciones de un evento (para el Staff que evalúa) */
+  async listarDeEvento(eventoId: string) {
+    const evento = await this.prisma.evento.findUnique({ where: { id: eventoId } });
+    if (!evento) throw new NotFoundException('Evento no encontrado');
+    return this.prisma.penalizacionAplicada.findMany({
+      where: { eventoClub: { eventoId } },
+      include: {
+        motivo: true,
+        eventoClub: { include: { club: { select: { id: true, nombre: true } } } },
+        usuario: { select: { id: true, nombre: true, username: true } },
+      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
