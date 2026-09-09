@@ -19,6 +19,13 @@ interface FilaRanking {
   club: string;
   puntaje: number;
 }
+interface FilaRankingApi {
+  posicion: number;
+  club: string;
+  puntaje?: number;
+  total?: number;
+}
+const normalizar = (r: FilaRankingApi): FilaRanking => ({ posicion: r.posicion, club: r.club, puntaje: r.puntaje ?? r.total ?? 0 });
 
 export default function RankingPage() {
   const { sesion, cargando } = useRequireAuth("admin");
@@ -36,15 +43,15 @@ export default function RankingPage() {
   async function cargarTemporada(t: string) {
     setTemporada(t);
     if (!t) return setRanking(null);
-    const res = await apiClient.get<{ ranking: FilaRanking[] }>(
+    const res = await apiClient.get<{ ranking: FilaRankingApi[] }>(
       `/organizaciones/${sesion!.organizacionId}/temporadas/${t}/ranking`,
     );
-    setRanking(res.ranking);
+    setRanking(res.ranking.map(normalizar));
   }
 
   async function verRankingEvento(e: Evento) {
-    const res = await apiClient.get<{ ranking: FilaRanking[] }>(`/eventos/${e.id}/ranking`);
-    setRankingsEvento((prev) => ({ ...prev, [e.id]: res.ranking }));
+    const res = await apiClient.get<{ ranking: FilaRankingApi[] }>(`/eventos/${e.id}/ranking`);
+    setRankingsEvento((prev) => ({ ...prev, [e.id]: res.ranking.map(normalizar) }));
   }
 
   if (cargando || !sesion || !eventos) return <Spinner />;

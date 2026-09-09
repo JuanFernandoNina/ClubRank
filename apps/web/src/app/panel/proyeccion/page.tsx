@@ -106,8 +106,8 @@ export default function ProyeccionPage() {
 
   const [p1, p2, p3, ...resto] = ranking ?? [];
 
-  const podiumCard = ({ posicion, club, puntaje, color, h }: { posicion: number; club: string; puntaje: number; color: string; h: string }) => (
-    <div className={`flex flex-col items-center justify-end rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ${h}`}>
+  const podiumCard = ({ posicion, club, puntaje, color, h, key }: { key: string; posicion: number; club: string; puntaje: number; color: string; h: string }) => (
+    <div key={key} className={`flex flex-col items-center justify-end rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ${h}`}>
       <div className="text-5xl">{MEDALLAS[posicion - 1] ?? `${posicion}º`}</div>
       <div className="mt-2 text-4xl font-black text-slate-800">{(puntaje ?? 0).toLocaleString("es")}</div>
       <div className="text-sm text-slate-400">puntos</div>
@@ -116,7 +116,7 @@ export default function ProyeccionPage() {
   );
 
   return (
-    <div ref={rootRef} className={`space-y-4 ${fullscreen ? "h-full overflow-y-auto p-6" : ""}`}>
+    <div ref={rootRef} className={`space-y-4 ${fullscreen ? "h-full overflow-y-auto bg-white p-6" : ""}`}>
       {/* Barra superior: selectores + pantalla completa */}
       <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
         <div className="leading-tight">
@@ -176,6 +176,7 @@ export default function ProyeccionPage() {
                     .filter((f): f is Fila => Boolean(f))
                     .map((f) =>
                       podiumCard({
+                        key: f.club,
                         posicion: f.posicion,
                         club: f.club,
                         puntaje: f.puntaje,
